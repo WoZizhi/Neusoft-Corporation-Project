@@ -12,7 +12,7 @@ class PatientModel : public QSqlQueryModel
 public:
     PatientModel()
     {
-        this->setQuery("select * from patient");
+        //this->setQuery("select * from patient");
     }
 
     //配置单元格标志
@@ -28,16 +28,16 @@ public:
         return flags;
     }
 
-    bool setName(int id, QString name)
+//修改姓名
+    bool setName(int patient_id, QString name)
     {
-        //todo
         bool ok;
         QSqlQuery query;
-        query.prepare("update kk.patient set name = :name where id = :id");
+        query.prepare("update ss.patient set name = :name where patient_id = :patient_id");
         query.bindValue(":name", name);
-        query.bindValue(":id", id);
+        query.bindValue(":patient_id", patient_id);
         ok = query.exec();
-        qDebug()<<id<<name;
+        qDebug()<<patient_id<<name;
         if(!ok)
         {
             qDebug()<<"setname error:"<<query.lastError();
@@ -45,17 +45,16 @@ public:
         return true;
     }
 
-    bool setSex(int id, QString sex)
+//修改性别
+    bool setSex(int patient_id, QString sex)
     {
-        //todo
         bool ok;
         QSqlQuery query;
-        query.prepare("update kk.patient set sex = :sex where id = :id");
+        query.prepare("update ss.patient set sex = :sex where patient_id = :patient_id");
         query.bindValue(":sex", sex);
-        query.bindValue(":id", id);
+        query.bindValue(":patient_id", patient_id);
         ok = query.exec();
-        //OK = queryRefresh.exec();
-        qDebug()<<id<<sex;
+        qDebug()<<patient_id<<sex;
         if(!ok)
         {
             qDebug()<<"setSex error:"<<query.lastError();
@@ -63,7 +62,7 @@ public:
         return true;
     }
 
-    bool setData(const QModelIndex &index, const QVariant &value, int)
+    bool setData(const QModelIndex &index, const QVariant &value, int)override
     {
         if (index.column() < 1 || index.column() > 2)
         {
@@ -89,10 +88,9 @@ public:
 
         if(OK)
         {
-            //this->setQuery("select * from patient");
-            this->setQuery("select * from patient left join device_patient on patient.id = device_patient.patient_id left join device on device.dev_id = device_patient.dev_id");
+            this->setQuery("select * from patient, device, device_patient where patient.patient_id = device_patient.patient_id and device.dev_id = device_patient.dev_id");
+            //this->setQuery("select * from patient left join device_patient on patient.patient_id = device_patient.patient_id and device.dev_id = device_patient.dev_id");
         }
-
         return OK;
 
     }
@@ -127,7 +125,7 @@ int main(int argc, char *argv[])
     db.setHostName("localhost");
 
     //数据库名字
-    db.setDatabaseName("kk");
+    db.setDatabaseName("ss");
 
     //用户名密码
     db.setUserName("wozizhi");
@@ -161,6 +159,7 @@ int main(int argc, char *argv[])
 //        {
 //            qDebug()<<query.lastError();
 //        }
+
         //数据查询
         queryOK = query.exec("select * from kk.doctor where uid = 'doctor2'");
         qDebug()<<query.size();
@@ -174,7 +173,8 @@ int main(int argc, char *argv[])
         query.prepare("select * from kk.doctor where uid = :id");
         QString uid = "doctor1";
         query.bindValue(":id", uid);
-        query.exec();
+        queryOK = query.exec();
+        qDebug()<<query.size();
         if (query.size() > 0)
         {
             while(query.next())
@@ -183,12 +183,10 @@ int main(int argc, char *argv[])
             }
         }
 
-
-
 //模拟终端设备给数据库上传波形数据
         //查询device表
         QSqlQuery queryDev;
-        queryDev.prepare("select * from kk.device where serial = :serial");
+        queryDev.prepare("select * from ss.device where serial = :serial");
         queryDev.bindValue(":serial", "DEV-002");
         OK = queryDev.exec();
         int dev_id = 0;
@@ -207,7 +205,7 @@ int main(int argc, char *argv[])
             else
             {
                 //增加当前设备
-                OK = queryDev.exec("insert into kk.device (serial) values ('DEV-002')");
+                OK = queryDev.exec("insert into ss.device (serial) values ('DEV-002')");
                 if(!OK)
                 {
                     qDebug()<<"增加设备错误"<<queryDev.lastError();
@@ -226,7 +224,7 @@ int main(int argc, char *argv[])
             bool queryWaveOK;
             short samples[10] = {2040,2041,2042,2043,2044,2045,2046,2047,2048,2049};
             QByteArray waves((char*)samples, sizeof(samples));
-            queryWave.prepare("insert into kk.ecg_sample (dev_id, value, time) values(:dev_id, :array, :time)");
+            queryWave.prepare("insert into ss.ecg (dev_id, value, time) values(:dev_id, :array, :time)");
             queryWave.bindValue("dev_id", dev_id);
             queryWave.bindValue(":array", waves);
             queryWave.bindValue(":time", QDateTime::currentDateTime());
@@ -246,7 +244,7 @@ int main(int argc, char *argv[])
         if(dev_id != 0)
         {
             QSqlQuery queryRefresh;
-            queryRefresh.prepare("update kk.device set refresh = now() where dev_id = :dev_id");
+            queryRefresh.prepare("update ss.device set refresh = now() where dev_id = :dev_id");
             queryRefresh.bindValue(":dev_id", dev_id);
             OK = queryRefresh.exec();
             if(OK)
@@ -273,10 +271,10 @@ int main(int argc, char *argv[])
         patientView->show();
 
         //显示病人设备关联表
-         //patientsDev.setQuery("select * from patient, device, device_patient where patient.id = device_patient.patient_id and device.dev_id = device_patient.dev_id");
-         patientsDev.setQuery("select * from patient left join device_patient on patient.id = device_patient.dev_id left join device on device.dev_id = device_patient.dev_id");
-         patientsDevView->setModel(&patientsDev);
-         patientsDevView->show();
+        patientsDev.setQuery("select * from patient, device, device_patient where patient.patient_id = device_patient.patient_id and device.dev_id = device_patient.dev_id");
+        //patientsDev.setQuery("select * from patient left join device_patient on patient.patient_id = device_patient.dev_id and device.dev_id = device_patient.dev_id");
+        patientsDevView->setModel(&patientsDev);
+        patientsDevView->show();
 
     }//db0k = True
 
